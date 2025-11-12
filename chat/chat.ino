@@ -25,16 +25,16 @@
 #define I2S_SLOT_MASK I2S_STD_SLOT_LEFT
 
 // WiFi settings
-const char* ssid     = "EE3070_P1615_1"; //YEUNGHOME
-const char* password = "EE3070P1615";//21780260
+const char* ssid     = "REDACTED";
+const char* password = "REDACTED";
 
 // Global audio variable declaration for TTS playback
 Audio audio;
 
 // API configurations
-const char* deepSeekApiKey = "sk-fbf29f79869b4f168ddcc640f879a985";
+const char* deepSeekApiKey = "REDACTED";
 const char* deepSeekApiUrl = "https://api.deepseek.com";
-const char* assemblyAIKey = "ca37c91925a4422d9c62746e5ea229d4";
+const char* assemblyAIKey = "REDACTED";
 ArduinoGPTChat gptChat(deepSeekApiKey, deepSeekApiUrl);
 
 // System prompt configuration
