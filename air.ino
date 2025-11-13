@@ -1,27 +1,42 @@
 #include "Arduino.h"
 #include <Wire.h>
+#include <WiFi.h>
+#include "ThingSpeak.h"
+#include "secrets.h"
 
 
 #define PWM_PIN 18
 #define FORWARD 17
 #define BACKWARD 16
 #define TEMP_PIN 1
+#define SDA_PIN 8
+#define SCL_PIN 9
 
 // Loop init
 unsigned long lastTime = 0;
-unsigned long timerDelay = 5000;
+unsigned long timerDelay = 10000;
 // variable init
 float currentTemp;
 float targetTemp = 25.0;
+float currentHumidity;
 float difference;
 int pwm = 0;
+WiFiClient client;
+unsigned long counterChannelNumber = SECRET_CH_ID;
+const char * myCounterReadAPIKey = SECRET_READ_APIKEY;
+const char * myCounterWriteAPIKey = SECRET_WRITE_APIKEY;
+unsigned int counterFieldNumber = 1;
+int RawADC = 0;
+char* ssid = SECRET_SSID;
+char* pass = SECRET_PASS;
+int statusCode;
 
 #define SHT30_ADDR 0x44
 
 // Single-shot, high repeatability, no clock stretching
 const uint8_t CMD_MEAS_HIGHREP[2] = {0x2C, 0x06};
 
-bool sht30_read(float &temperatureC) {
+bool sht30_read(float &temperatureC, float &humidityRH) {
   Wire.beginTransmission(SHT30_ADDR);
   Wire.write(CMD_MEAS_HIGHREP, 2);
   if (Wire.endTransmission() != 0) {
@@ -41,10 +56,19 @@ bool sht30_read(float &temperatureC) {
   uint16_t rawRH = (uint16_t(d[3]) << 8) | d[4];
 
   temperatureC = -45.0f + 175.0f * (float)rawT / 65535.0f;
+  humidityRH   = 100.0f * (float)rawRH / 65535.0f;
+
   return true;
 }
 
-void setup() {
+int writeStatus() {
+  int statusCode = ThingSpeak.getLastReadStatus();
+  if (statusCode == 200) Serial.println("Channel update successful.");
+  else Serial.println("Problem updating channel. HTTP error code " + String(statusCode));
+  return 0;
+}
+
+void air_setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   pinMode(PWM_PIN, OUTPUT);
@@ -53,15 +77,28 @@ void setup() {
   pinMode(TEMP_PIN, INPUT);
   digitalWrite(FORWARD, HIGH);
   digitalWrite(BACKWARD, HIGH);
-  Wire.begin(8, 9);
+  Wire.begin(SDA_PIN, SCL_PIN);
+
+  WiFi.mode(WIFI_STA);
+  ThingSpeak.begin(client);  // Initialize ThingSpeak
+
+  if(WiFi.status() != WL_CONNECTED){
+    Serial.print("Attempting to connect to SSID: ");
+    Serial.println(ssid);
+    while(WiFi.status() != WL_CONNECTED){
+      WiFi.begin(ssid, pass); // Connect to WPA/WPA2 network. Change this line if using open or WEP network
+      Serial.print(".");
+      delay(5000);
+    }
+    Serial.println("\nConnected");
+  }
 }
 
-void loop() {
+void air_loop() {
   // put your main code here, to run repeatedly:
   String command = Serial.readStringUntil('/n');
   if (command.toFloat() != 0) targetTemp = command.toFloat();
-  //currentTemp = analogRead(TEMP_PIN) / 10;
-  sht30_read(currentTemp);
+  sht30_read(currentTemp,currentHumidity);
 
   if ((millis() - lastTime) > timerDelay) {
     Serial.print("Current (ºC): ");
@@ -94,7 +131,14 @@ void loop() {
       lastTime -= 500;
     }
 
-
+    Serial.print("Current Humidity: ");
+    Serial.print(currentHumidity);
+    Serial.println("%");
+    ThingSpeak.setField(1, currentTemp);
+    ThingSpeak.setField(2, currentHumidity);
+    statusCode = ThingSpeak.writeFields(counterChannelNumber, myCounterWriteAPIKey);
+    writeStatus();
+    
     Serial.println();
     lastTime = millis();
   }
