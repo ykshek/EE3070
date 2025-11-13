@@ -1,9 +1,6 @@
 #include "Arduino.h"
 #include <Wire.h>
-#include <WiFi.h>
 #include "ThingSpeak.h"
-#include "secrets.h"
-
 
 #define PWM_PIN 18
 #define FORWARD 17
@@ -12,24 +9,14 @@
 #define SDA_PIN 8
 #define SCL_PIN 9
 
-// Loop init
-unsigned long lastTime = 0;
-unsigned long timerDelay = 10000;
+
 // variable init
 float currentTemp;
 float targetTemp = 25.0;
 float currentHumidity;
 float difference;
 int pwm = 0;
-WiFiClient client;
-unsigned long counterChannelNumber = SECRET_CH_ID;
-const char * myCounterReadAPIKey = SECRET_READ_APIKEY;
-const char * myCounterWriteAPIKey = SECRET_WRITE_APIKEY;
-unsigned int counterFieldNumber = 1;
-int RawADC = 0;
-char* ssid = SECRET_SSID;
-char* pass = SECRET_PASS;
-int statusCode;
+
 
 #define SHT30_ADDR 0x44
 
@@ -61,12 +48,6 @@ bool sht30_read(float &temperatureC, float &humidityRH) {
   return true;
 }
 
-int writeStatus() {
-  int statusCode = ThingSpeak.getLastReadStatus();
-  if (statusCode == 200) Serial.println("Channel update successful.");
-  else Serial.println("Problem updating channel. HTTP error code " + String(statusCode));
-  return 0;
-}
 
 void air_setup() {
   // put your setup code here, to run once:
@@ -79,19 +60,6 @@ void air_setup() {
   digitalWrite(BACKWARD, HIGH);
   Wire.begin(SDA_PIN, SCL_PIN);
 
-  WiFi.mode(WIFI_STA);
-  ThingSpeak.begin(client);  // Initialize ThingSpeak
-
-  if(WiFi.status() != WL_CONNECTED){
-    Serial.print("Attempting to connect to SSID: ");
-    Serial.println(ssid);
-    while(WiFi.status() != WL_CONNECTED){
-      WiFi.begin(ssid, pass); // Connect to WPA/WPA2 network. Change this line if using open or WEP network
-      Serial.print(".");
-      delay(5000);
-    }
-    Serial.println("\nConnected");
-  }
 }
 
 void air_loop() {
@@ -100,46 +68,40 @@ void air_loop() {
   if (command.toFloat() != 0) targetTemp = command.toFloat();
   sht30_read(currentTemp,currentHumidity);
 
-  if ((millis() - lastTime) > timerDelay) {
-    Serial.print("Current (ºC): ");
-    Serial.println(currentTemp);
-    Serial.print("Target (ºC): ");
-    Serial.println(targetTemp);
-    difference = targetTemp - currentTemp;
-    difference = constrain(difference * 70, -200, 255);
+  Serial.print("Current (ºC): ");
+  Serial.println(currentTemp);
+  Serial.print("Target (ºC): ");
+  Serial.println(targetTemp);
+  difference = targetTemp - currentTemp;
+  difference = constrain(difference * 70, -200, 255);
 
-    if (difference > 0) {
-      digitalWrite(FORWARD, HIGH);
-      digitalWrite(BACKWARD, LOW);
-      analogWrite(PWM_PIN, (int) difference);
-      Serial.print("Mode: Heating, PWM = ");
-      Serial.print((int) ((difference/255)*100));
-      Serial.println("%");
-    }
-    if (difference < 0) {
-      digitalWrite(FORWARD, LOW);
-      digitalWrite(BACKWARD, HIGH);
-      analogWrite(PWM_PIN, -(int) difference);
-      Serial.print("Mode: Cooling, PWM = ");
-      Serial.print(-(int) ((difference/200)*100));
-      Serial.println("%");
-    }
-    if (difference == 0) {
-      analogWrite(PWM_PIN, 0);
-      Serial.print("Mode: Idle");
-      Serial.println();
-      lastTime -= 500;
-    }
-
-    Serial.print("Current Humidity: ");
-    Serial.print(currentHumidity);
+  if (difference > 0) {
+    digitalWrite(FORWARD, HIGH);
+    digitalWrite(BACKWARD, LOW);
+    analogWrite(PWM_PIN, (int) difference);
+    Serial.print("Mode: Heating, PWM = ");
+    Serial.print((int) ((difference/255)*100));
     Serial.println("%");
-    ThingSpeak.setField(1, currentTemp);
-    ThingSpeak.setField(2, currentHumidity);
-    statusCode = ThingSpeak.writeFields(counterChannelNumber, myCounterWriteAPIKey);
-    writeStatus();
-    
-    Serial.println();
-    lastTime = millis();
   }
+  if (difference < 0) {
+    digitalWrite(FORWARD, LOW);
+    digitalWrite(BACKWARD, HIGH);
+    analogWrite(PWM_PIN, -(int) difference);
+    Serial.print("Mode: Cooling, PWM = ");
+    Serial.print(-(int) ((difference/200)*100));
+    Serial.println("%");
+  }
+  if (difference == 0) {
+    analogWrite(PWM_PIN, 0);
+    Serial.print("Mode: Idle");
+    Serial.println();
+    lastTime -= 500;
+  }
+
+  Serial.print("Current Humidity: ");
+  Serial.print(currentHumidity);
+  Serial.println("%");
+  ThingSpeak.setField(1, currentTemp);
+  ThingSpeak.setField(2, currentHumidity);
+
 }
