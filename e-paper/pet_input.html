@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pet Name Input</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f0f8ff;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border: 3px solid #4CAF50;
+        }
+
+        h2 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            margin: 15px 0;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 18px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            width: 100%;
+            margin: 10px 0;
+            transition: background 0.3s;
+        }
+
+            button:hover {
+                background: #45a049;
+            }
+
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .quick-buttons {
+            margin-top: 20px;
+        }
+
+        .quick-btn {
+            background: #2196F3;
+            padding: 10px 15px;
+            margin: 5px;
+            font-size: 14px;
+            width: auto;
+        }
+
+            .quick-btn:hover {
+                background: #1976D2;
+            }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🐾 Enter Your Tortoise's Name</h2>
+
+        <form id="petForm">
+            <input type="text" id="petName" placeholder="Type your Tortoise's name here..." required>
+            <button type="submit">Send to Display</button>
+        </form>
+
+        <div id="result"></div>
+
+        <div class="quick-buttons">
+            <p style="text-align: center; color: #666;">Quick test:</p>
+            <button class="quick-btn" onclick="sendQuickName('Buddy')">Buddy</button>
+            <button class="quick-btn" onclick="sendQuickName('Luna')">Luna</button>
+            <button class="quick-btn" onclick="sendQuickName('Max')">Max</button>
+            <button class="quick-btn" onclick="sendQuickName('Bella')">Bella</button>
+        </div>
+    </div>
+
+    <script>
+        // 🔑 REPLACE THIS WITH YOUR ACTUAL WRITE API KEY
+        const API_KEY = '7B6O7C0Z7FWJVUYJ';
+
+        function sendQuickName(name) {
+            document.getElementById('petName').value = name;
+            sendName();
+        }
+
+        function sendName() {
+            const name = document.getElementById('petName').value.trim();
+            const resultDiv = document.getElementById('result');
+
+            if (!name) {
+                resultDiv.innerHTML = 'Please enter a pet name';
+                resultDiv.className = 'error';
+                return;
+            }
+
+            // Send to Field 2 with "Name:" prefix to trigger your React
+            const url = `https://api.thingspeak.com/update?api_key=${API_KEY}&field2=Name: ${encodeURIComponent(name)}`;
+
+            resultDiv.innerHTML = 'Sending...';
+            resultDiv.className = '';
+
+            fetch(url)
+                .then(response => response.text())
+                .then(data => {
+                    if (data !== '0') {
+                        resultDiv.innerHTML = `✅ Success! "${name}" sent to display<br><small>Entry ID: ${data}</small>`;
+                        resultDiv.className = 'success';
+                        document.getElementById('petName').value = '';
+                    } else {
+                        throw new Error('Failed to update');
+                    }
+                })
+                .catch(error => {
+                    resultDiv.innerHTML = '❌ Error sending name. Check your API key.';
+                    resultDiv.className = 'error';
+                    console.error('Error:', error);
+                });
+        }
+
+        // Form submission handler
+        document.getElementById('petForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            sendName();
+        });
+
+        // Enter key support
+        document.getElementById('petName').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendName();
+            }
+        });
+
+        // Focus on input when page loads
+        document.getElementById('petName').focus();
+    </script>
+</body>
+</html>

@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Voice Assistant - Live Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container { 
+            background: rgba(255,255,255,0.1); 
+            backdrop-filter: blur(10px);
+            padding: 20px; 
+            border-radius: 15px; 
+            margin-bottom: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .status { 
+            padding: 15px; 
+            border-radius: 10px; 
+            margin: 10px 0; 
+            font-weight: bold;
+            text-align: center;
+            font-size: 18px;
+        }
+        .connected { background: #4CAF50; }
+        .monitoring { background: #2196F3; animation: pulse 1s infinite; }
+        .error { background: #f44336; }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        .conversation { 
+            background: rgba(255,255,255,0.9);
+            color: #333;
+            padding: 20px;
+            border-radius: 10px;
+            min-height: 300px;
+            max-height: 500px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+        .user-msg { 
+            background: #E3F2FD; 
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+            border-left: 4px solid #2196F3;
+        }
+        .ai-msg { 
+            background: #F3E5F5; 
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+            border-left: 4px solid #9C27B0;
+        }
+        button { 
+            padding: 15px 30px; 
+            margin: 10px; 
+            border: none; 
+            border-radius: 25px; 
+            cursor: pointer;
+            font-size: 16px;
+            background: #FF5722;
+            color: white;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #E64A19;
+            transform: scale(1.05);
+        }
+        .controls { text-align: center; margin: 20px 0; }
+        h1, h2, h3 { text-align: center; }
+        .info-box {
+            background: rgba(255,255,255,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        .timestamp {
+            font-size: 12px;
+            color: #666;
+            text-align: right;
+        }
+        .last-update {
+            background: rgba(255,255,255,0.2);
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            margin: 10px 0;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(255,255,255,0.2);
+            padding: 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 AI Voice Assistant Monitor</h1>
+        <h3>Live Conversation Feed</h3>
+        
+        <div id="status" class="status connected">Ready to Monitor</div>
+        
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-value" id="totalMessages">0</div>
+                <div class="stat-label">Total Messages</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="lastEntryId">0</div>
+                <div class="stat-label">Last Entry ID</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="updateCount">0</div>
+                <div class="stat-label">Checks Made</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button onclick="startMonitoring()">🔄 Start Live Monitoring</button>
+            <button onclick="stopMonitoring()">⏹️ Stop Monitoring</button>
+            <button onclick="clearConversation()">🗑️ Clear Chat</button>
+        </div>
+        
+        <div class="last-update">
+            <strong>Last Check:</strong> <span id="lastCheck">Never</span> | 
+            <strong>Next Check:</strong> <span id="nextCheck">-</span> |
+            <strong>Status:</strong> <span id="monitorStatus">Ready</span>
+        </div>
+        
+        <div class="container">
+            <h3>Live Conversation</h3>
+            <div id="conversation" class="conversation">
+                <div class="ai-msg">🤖 AI: Welcome! Click "Start Live Monitoring" to see real-time conversations from your AI assistant.</div>
+            </div>
+        </div>
+        
+        <div class="container">
+            <h3>System Information</h3>
+            <div class="info-box">
+                <strong>ThingSpeak Channel:</strong> 3172003<br>
+                <strong>Read API Key:</strong> Configured ✓<br>
+                <strong>Update Interval:</strong> 3 seconds<br>
+                <strong>Response Cleaning:</strong> Enabled ✓<br>
+                <strong>Connection:</strong> <span id="connectionStatus">Ready</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - Pre-configured with your API key
+        const config = {
+            channelId: '3172003',
+            readApiKey: 'F0XQ7MYBDCBROOZ5', // Your Read API Key pre-configured
+            updateInterval: 3000, // 3 seconds
+            isMonitoring: false,
+            monitorInterval: null,
+            lastEntryId: 0,
+            totalMessages: 0,
+            updateCount: 0
+        };
+
+        // Clean ThingSpeak responses
+        function cleanThingSpeakResponse(text) {
+            console.log("Raw from ThingSpeak:", text);
+            
+            let cleanText = text
+                .replace(/P49/g, '')
+                .replace(/p48/g, '')
+                .replace(/W70/g, '')
+                .replace(/W56/g, '')
+                .replace(/V65/g, '')
+                .replace(/Q70/g, '?')
+                .replace(/P55/g, "'")
+                .replace(/P67/g, '.')
+                .replace(/P\d{2}/g, '') // Remove any P followed by 2 digits
+                .replace(/[WV]\d+/g, '') // Remove W or V followed by numbers
+                .replace(/\s+/g, ' ') // Remove extra spaces
+                .trim();
+            
+            console.log("Cleaned text:", cleanText);
+            return cleanText;
+        }
+
+        // Update status display
+        function updateStatus(message, isError = false) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            
+            if (isError) {
+                statusDiv.className = 'status error';
+            } else if (config.isMonitoring) {
+                statusDiv.className = 'status monitoring';
+            } else {
+                statusDiv.className = 'status connected';
+            }
+        }
+
+        // Add message to conversation
+        function addMessage(type, text) {
+            const conversation = document.getElementById('conversation');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type + '-msg';
+            
+            const timestamp = new Date().toLocaleTimeString();
+            messageDiv.innerHTML = (type === 'user' ? '🎤 You: ' : '🤖 AI: ') + text + 
+                                 '<div class="timestamp">' + timestamp + '</div>';
+            
+            conversation.appendChild(messageDiv);
+            conversation.scrollTop = conversation.scrollHeight;
+            
+            // Update stats
+            config.totalMessages++;
+            updateStats();
+        }
+
+        // Update statistics
+        function updateStats() {
+            document.getElementById('totalMessages').textContent = config.totalMessages;
+            document.getElementById('lastEntryId').textContent = config.lastEntryId;
+            document.getElementById('updateCount').textContent = config.updateCount;
+        }
+
+        // Fetch data from ThingSpeak
+        async function fetchThingSpeakData() {
+            const url = `https://api.thingspeak.com/channels/${config.channelId}/feeds/last.json?api_key=${config.readApiKey}`;
+            
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                config.updateCount++;
+                updateLastCheck();
+                
+                // Check if we have new data
+                const currentEntryId = parseInt(data.entry_id);
+                if (currentEntryId > config.lastEntryId) {
+                    config.lastEntryId = currentEntryId;
+                    
+                    // Clean the responses before displaying
+                    const userText = cleanThingSpeakResponse(data.field1 || '(No transcription)');
+                    const aiText = cleanThingSpeakResponse(data.field2 || '(No AI response)');
+                    
+                    if (userText !== '(No transcription)') {
+                        addMessage('user', userText);
+                    }
+                    if (aiText !== '(No AI response)') {
+                        addMessage('ai', aiText);
+                    }
+                    
+                    updateStatus(`✅ New conversation! Entry #${currentEntryId}`);
+                    
+                    // Show notification if browser supports it
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification('New AI Response', {
+                            body: `You: ${userText.substring(0, 50)}...`
+                        });
+                    }
+                } else {
+                    updateStatus(`📡 Monitoring - Check #${config.updateCount}`);
+                }
+                
+                document.getElementById('connectionStatus').textContent = 'Connected ✓';
+                updateStats();
+                
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                updateStatus(`❌ Error: ${error.message}`, true);
+                document.getElementById('connectionStatus').textContent = 'Error ✗';
+            }
+        }
+
+        // Update last check time
+        function updateLastCheck() {
+            const now = new Date();
+            document.getElementById('lastCheck').textContent = now.toLocaleTimeString();
+            
+            const nextCheck = new Date(now.getTime() + config.updateInterval);
+            document.getElementById('nextCheck').textContent = nextCheck.toLocaleTimeString();
+        }
+
+        // Start monitoring
+        function startMonitoring() {
+            if (config.isMonitoring) {
+                return;
+            }
+
+            config.isMonitoring = true;
+            document.getElementById('monitorStatus').textContent = 'Live Monitoring';
+            updateStatus('🔄 Starting live monitoring...');
+
+            // Request notification permission
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+
+            // Fetch immediately
+            fetchThingSpeakData();
+
+            // Set up interval
+            config.monitorInterval = setInterval(fetchThingSpeakData, config.updateInterval);
+            
+            addMessage('ai', '🔴 Live monitoring started! Watching for new conversations every 3 seconds...');
+        }
+
+        // Stop monitoring
+        function stopMonitoring() {
+            if (!config.isMonitoring) {
+                return;
+            }
+
+            config.isMonitoring = false;
+            if (config.monitorInterval) {
+                clearInterval(config.monitorInterval);
+                config.monitorInterval = null;
+            }
+            
+            document.getElementById('monitorStatus').textContent = 'Stopped';
+            document.getElementById('nextCheck').textContent = '-';
+            updateStatus('⏹️ Monitoring stopped');
+            addMessage('ai', 'Monitoring stopped.');
+        }
+
+        // Clear conversation
+        function clearConversation() {
+            document.getElementById('conversation').innerHTML = 
+                '<div class="ai-msg">🤖 AI: Conversation cleared. Ready for new messages!</div>';
+            config.totalMessages = 0;
+            config.lastEntryId = 0;
+            updateStats();
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStats();
+            updateLastCheck();
+            
+            // Auto-start monitoring after 2 seconds
+            setTimeout(() => {
+                startMonitoring();
+            }, 2000);
+        });
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                console.log('Page hidden - monitoring continues in background');
+            } else {
+                console.log('Page visible');
+                updateLastCheck();
+            }
+        });
+    </script>
+</body>
+</html>
