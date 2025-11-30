@@ -43,6 +43,7 @@ void IoT_setup() {
 
 void setup() {
   // put your setup code here, to run once:
+  Serial.begin(115200);
   IoT_setup();
   air_setup();
   ph_setup();

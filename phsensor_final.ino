@@ -12,7 +12,6 @@ float pHintercept = 18.30;
   
 void ph_setup()
 {
-  Serial.begin(115200);
   pinMode(pH_SENSOR_PIN, INPUT);
 }
   

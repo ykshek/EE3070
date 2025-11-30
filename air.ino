@@ -51,7 +51,7 @@ bool sht30_read(float &temperatureC, float &humidityRH) {
 
 void air_setup() {
   // put your setup code here, to run once:
-  Serial.begin(115200);
+  
   pinMode(PWM_PIN, OUTPUT);
   pinMode(FORWARD, OUTPUT);
   pinMode(BACKWARD, OUTPUT);
@@ -73,14 +73,14 @@ void air_loop() {
   Serial.print("Target (ºC): ");
   Serial.println(targetTemp);
   difference = targetTemp - currentTemp;
-  difference = constrain(difference * 70, -200, 255);
+  difference = constrain(difference * 70, -255, 170);
 
   if (difference > 0) {
     digitalWrite(FORWARD, HIGH);
     digitalWrite(BACKWARD, LOW);
     analogWrite(PWM_PIN, (int) difference);
     Serial.print("Mode: Heating, PWM = ");
-    Serial.print((int) ((difference/255)*100));
+    Serial.print((int) ((difference/170)*100));
     Serial.println("%");
   }
   if (difference < 0) {
@@ -88,7 +88,7 @@ void air_loop() {
     digitalWrite(BACKWARD, HIGH);
     analogWrite(PWM_PIN, -(int) difference);
     Serial.print("Mode: Cooling, PWM = ");
-    Serial.print(-(int) ((difference/200)*100));
+    Serial.print(-(int) ((difference/255)*100));
     Serial.println("%");
   }
   if (difference == 0) {
